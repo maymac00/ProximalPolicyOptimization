@@ -2,10 +2,10 @@ import abc
 
 import numpy as np
 
-from .SoftmaxActorI import SoftmaxActorI
+from .SoftmaxActor import SoftmaxActorI
 
 
-class ActionFilterI(abc.ABC):
+class SoftmaxFilterI(abc.ABC):
     def __init__(self, actor: SoftmaxActorI, **kwargs):
         self.actor = actor
         pass
@@ -20,7 +20,7 @@ class ActionFilterI(abc.ABC):
         return getattr(self.actor, item)
 
 
-class LowProbFilter(ActionFilterI):
+class LowProbFilter(SoftmaxFilterI):
     def __init__(self, actor: SoftmaxActorI, low_prob: float, **kwargs):
         super().__init__(actor, **kwargs)
         self.low_thld = low_prob
@@ -38,5 +38,19 @@ class LowProbFilter(ActionFilterI):
                     cont += 1
                 else:
                     probs[i] = 0
+        return self.actor.select_action(probs)
+
+class GreedyFilter(SoftmaxFilterI):
+    def __init__(self, actor: SoftmaxActorI, threshold, **kwargs):
+        super().__init__(actor, **kwargs)
+        self.threshold = threshold
+        pass
+
+    def select_action(self, probs):
+        # Set all to 0 except the max if it is above the threshold
+        max_index = np.argmax(probs)
+        if probs[max_index] > self.threshold:
+            probs = np.zeros_like(probs)
+            probs[max_index] = 1
         return self.actor.select_action(probs)
 

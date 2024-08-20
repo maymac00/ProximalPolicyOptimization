@@ -1,28 +1,70 @@
-from .SoftmaxActorI import SoftmaxActorI
 import torch as th
+import torchviz
+
 from PPO.layers import Linear
+from PPO.utils import normalize
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import abc
 
 
-class SoftmaxActor(SoftmaxActorI, nn.Module):
+class SoftmaxActorI(abc.ABC, nn.Module):
 
+    def __init__(self, o_size, a_size, h_size, h_layers, action_map=None, **kwargs):
+        super().__init__()
+        self.o_size = o_size
+        self.a_size = a_size
+        self.h_size = h_size
+        self.h_layers = h_layers
+        self.action_map = action_map
+        if action_map is None:
+            self.action_map = {i: i for i in range(a_size)}
+
+    @abc.abstractmethod
+    def forward(self, x):
+        pass
+
+    @abc.abstractmethod
+    def get_action(self, x, action=None):
+        pass
+
+    @abc.abstractmethod
+    def get_action_data(self, prob, action=None):
+        pass
+
+    @abc.abstractmethod
+    def predict(self, x):
+        pass
+
+    @abc.abstractmethod
+    def select_action(self, probs):
+        pass
+
+    @abc.abstractmethod
+    def load(self, path):
+        pass
+
+    @abc.abstractmethod
+    def update(self, b, optimizer):
+        pass
+
+
+class SoftmaxActor(SoftmaxActorI):
     def __init__(self, o_size: int, a_size: int, h_size: int, h_layers: int):
         SoftmaxActorI.__init__(self, o_size, a_size, h_size, h_layers)
-        nn.Module.__init__(self)
 
-        self.hidden = [None] * h_layers
-        self.hidden[0] = Linear(o_size, h_size, act_fn='tanh')
-        for i in range(1, len(self.hidden)):
-            self.hidden[i] = Linear(h_size, h_size, act_fn='tanh')
+        self.fully_connected = [None] * h_layers
+        self.fully_connected[0] = Linear(o_size, h_size, act_fn='tanh')
+        for i in range(1, len(self.fully_connected)):
+            self.fully_connected[i] = Linear(h_size, h_size, act_fn='tanh')
 
-        # self.hidden = nn.ModuleList(self.hidden)
         self.output = nn.Linear(h_size, a_size)
+        self.fully_connected = nn.ModuleList(self.fully_connected)
 
     def forward(self, x):
-        for i in range(len(self.hidden)):
-            l = self.hidden[i]
+        for i in range(len(self.fully_connected)):
+            l = self.fully_connected[i]
             x = th.tanh(l(x))
         x = self.output(x)
         return F.softmax(x, dim=-1)
@@ -63,3 +105,58 @@ class SoftmaxActor(SoftmaxActorI, nn.Module):
 
     def load(self, path):
         raise NotImplementedError
+
+
+    def update(self, b, optimizer):
+        update_metrics = {}
+
+        # TODO: Parametrize
+        self.n_epochs = 10
+        self.norm_adv = True
+        self.clip = 0.2
+        self.log_gradients = False
+        self.entropy_value = 0.01
+        self.max_grad_norm = 1.0
+
+        for epoch in range(self.n_epochs):
+            _, _, logprob, entropy = self.get_action(b['observations'], b['actions'])
+            entropy_loss = entropy.mean()
+
+            update_metrics[f"Entropy"] = entropy_loss.detach()
+
+            logratio = logprob - b['logprobs']
+            ratio = logratio.exp()
+            update_metrics[f"Ratio"] = ratio.mean().detach()
+
+            mb_advantages = b['advantages']
+            if self.norm_adv: mb_advantages = normalize(mb_advantages)
+
+            actor_loss = mb_advantages * ratio
+            update_metrics[f"Actor Loss Non-Clipped"] = actor_loss.mean().detach()
+
+            clipped_ratios = th.clamp(ratio, 1 - self.clip, 1 + self.clip)
+            actor_clip_loss = mb_advantages * clipped_ratios
+
+            # Log percent of clipped ratio
+            update_metrics[f"Clipped Ratio"] = ((ratio < (1 - self.clip)).sum().item() + (
+                        ratio > (1 + self.clip)).sum().item()) / np.prod(ratio.shape)
+
+            # Calculate clip fraction
+            actor_loss = th.min(actor_loss, actor_clip_loss).mean()
+            update_metrics[f"Actor Loss"] = actor_loss.detach()
+
+            actor_loss = -actor_loss - self.entropy_value * entropy_loss
+            update_metrics[f"Actor Loss with Entropy"] = actor_loss.detach()
+
+            optimizer.zero_grad(set_to_none=True)
+            actor_loss.backward()
+
+            if self.log_gradients:
+                for name, param in self.named_parameters():
+                    if param.grad is not None:
+                        grad_norm = param.grad.norm().item()
+                        # update_metrics[f"ZGradients: {name}"] = grad_norm
+
+            nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
+            optimizer.step()
+        return update_metrics
