@@ -1,3 +1,3 @@
-from TensorBoardCallback import TensorBoardCallback
-from AnnealEntropyCallback import AnnealEntropyCallback
-from CallbacksI import UpdateCallback
+from .TensorBoardCallback import TensorBoardCallback
+from .AnnealEntropyCallback import AnnealEntropyCallback
+from .CallbacksI import UpdateCallback

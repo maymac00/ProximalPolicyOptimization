@@ -1,3 +1,3 @@
 from .SoftmaxActor import SoftmaxActor, SoftmaxActorI
-from .filters import *
+from .filters import SoftmaxFilterI, LowProbFilter, GreedyFilter
 
