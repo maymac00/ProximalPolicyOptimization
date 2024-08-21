@@ -1,6 +1,8 @@
 import argparse
 
 import torch as th
+from numpy import dtype
+
 from ..layers import Linear
 from ..utils import normalize
 from .filters import SoftmaxFilterI
@@ -123,6 +125,7 @@ class SoftmaxActor(SoftmaxActorI):
         if self.action_filter is not None:
             probs = self.action_filter.select_action(probs)
         if probs.sum() != 1.0:
+            probs = np.array(probs, dtype='float64')
             probs = probs / probs.sum()
         return np.random.multinomial(1, probs).argmax()
 
