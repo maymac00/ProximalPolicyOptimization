@@ -1,5 +1,5 @@
 import abc
-from PPO.PPOAgent import PPOAgentI
+from ..PPOAgent import PPOAgentI
 
 class LRSchedulerI(abc.ABC):
     def __init__(self, agent: PPOAgentI, n_updates: int):

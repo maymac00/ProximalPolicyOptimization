@@ -1,9 +1,9 @@
 import argparse
 
 import torch as th
-from PPO.layers import Linear
-from PPO.utils import normalize
-import filters
+from ..layers import Linear
+from ..utils import normalize
+from .filters import SoftmaxFilterI
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
@@ -12,7 +12,7 @@ import abc
 
 class SoftmaxActorI(abc.ABC, nn.Module):
 
-    def __init__(self, o_size, a_size, h_size, h_layers, action_map=None, action_filter: filters.SoftmaxFilterI =None , **kwargs):
+    def __init__(self, o_size, a_size, h_size, h_layers, action_map=None, action_filter: SoftmaxFilterI =None , **kwargs):
         super().__init__()
         self.o_size = o_size
         self.a_size = a_size

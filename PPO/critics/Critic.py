@@ -2,7 +2,7 @@ import numpy as np
 
 from .CriticI import CriticI
 from torch import nn
-from PPO.layers import Linear
+from ..layers import Linear
 import torch as th
 from torch.nn import functional as F
 
