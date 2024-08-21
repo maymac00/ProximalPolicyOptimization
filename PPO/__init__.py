@@ -1,6 +1,6 @@
 from .PPOAgent import PPOAgent
-import actors
-import buffers
-import callbacks
-import critics
-import lr_schedulers
+from actors import *
+from buffers import *
+from callbacks import *
+from critics import *
+from lr_schedulers import *
