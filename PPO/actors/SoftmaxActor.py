@@ -93,7 +93,7 @@ class SoftmaxActor(SoftmaxActorI):
         env_action, action, logprob, entropy = self.get_action_data(prob, action)
         return env_action, action, logprob.gather(-1, action.to(th.int64)).squeeze(), entropy
 
-    def get_action_data(self, prob, action=None):
+    def get_action_data(self, prob : th.Tensor, action=None):
         env_action = None
         if action is None:
             act = self.select_action(prob.detach())
