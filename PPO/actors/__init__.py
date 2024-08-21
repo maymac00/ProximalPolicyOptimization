@@ -1,2 +1,3 @@
-from .SoftmaxActor import SoftmaxActor
+from .SoftmaxActor import SoftmaxActor, SoftmaxActorI
+from .filters import *
 

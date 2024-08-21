@@ -1,1 +1,1 @@
-from .actors.SoftmaxActor import SoftmaxActor
+from PPOAgent import PPOAgent
