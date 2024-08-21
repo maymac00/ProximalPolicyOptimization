@@ -122,6 +122,8 @@ class SoftmaxActor(SoftmaxActorI):
         """
         if self.action_filter is not None:
             probs = self.action_filter.select_action(probs)
+        if probs.sum() != 1.0:
+            probs = probs / probs.sum()
         return np.random.multinomial(1, probs).argmax()
 
     def load(self, path):
