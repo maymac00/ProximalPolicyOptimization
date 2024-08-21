@@ -1,4 +1,4 @@
-from PPOAgent import PPOAgent
+from .PPOAgent import PPOAgent
 import actors
 import buffers
 import callbacks
