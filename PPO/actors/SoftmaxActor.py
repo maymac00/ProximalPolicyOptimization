@@ -1,8 +1,9 @@
-import torch as th
-import torchviz
+import argparse
 
+import torch as th
 from PPO.layers import Linear
 from PPO.utils import normalize
+from .filters import SoftmaxFilterI
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
@@ -11,13 +12,20 @@ import abc
 
 class SoftmaxActorI(abc.ABC, nn.Module):
 
-    def __init__(self, o_size, a_size, h_size, h_layers, action_map=None, **kwargs):
+    def __init__(self, o_size, a_size, h_size, h_layers, action_map=None, action_filter: SoftmaxFilterI =None , **kwargs):
         super().__init__()
         self.o_size = o_size
         self.a_size = a_size
         self.h_size = h_size
         self.h_layers = h_layers
         self.action_map = action_map
+        self.action_filter = action_filter
+
+        args = self.argparse().parse_known_args()[0]
+        self.__dict__.update(args.__dict__)
+
+        self.entropy_value = self.ent_coef
+
         if action_map is None:
             self.action_map = {i: i for i in range(a_size)}
 
@@ -49,8 +57,19 @@ class SoftmaxActorI(abc.ABC, nn.Module):
     def update(self, b, optimizer):
         pass
 
+    def argparse(self):
+        parser = argparse.ArgumentParser()
+        # Common configuration for any PPO agent
+        parser.add_argument("--actor-epochs", type=int, default=20, help="Number of epochs for the actor")
+        parser.add_argument("--actor-norm-adv", type=bool, default=True, help="Normalize advantages")
+        parser.add_argument("--clip", type=float, default=0.2, help="Clipping parameter")
+        parser.add_argument("--ent-coef", type=float, default=0.02, help="Entropy coefficient")
+        parser.add_argument("--max-grad-norm", type=float, default=1.0, help="Max gradient norm")
+        return parser
+
 
 class SoftmaxActor(SoftmaxActorI):
+
     def __init__(self, o_size: int, a_size: int, h_size: int, h_layers: int):
         SoftmaxActorI.__init__(self, o_size, a_size, h_size, h_layers)
 
@@ -91,8 +110,8 @@ class SoftmaxActor(SoftmaxActorI):
             x = th.tensor(x, dtype=th.float32)
         with th.no_grad():
             prob = self.forward(x)
-            action, env_action = self.select_action(np.array(prob, dtype='float64').squeeze())
-        return env_action
+            action = self.select_action(np.array(prob, dtype='float64').squeeze())
+        return self.action_map[action]
 
     def select_action(self, probs):
         """
@@ -101,24 +120,18 @@ class SoftmaxActor(SoftmaxActorI):
         :param probs:
         :return:
         """
+        if self.action_filter is not None:
+            probs = self.action_filter.select_action(probs)
         return np.random.multinomial(1, probs).argmax()
 
     def load(self, path):
-        raise NotImplementedError
+        self.load_state_dict(th.load(path))
 
 
     def update(self, b, optimizer):
         update_metrics = {}
 
-        # TODO: Parametrize
-        self.n_epochs = 10
-        self.norm_adv = True
-        self.clip = 0.2
-        self.log_gradients = False
-        self.entropy_value = 0.01
-        self.max_grad_norm = 1.0
-
-        for epoch in range(self.n_epochs):
+        for epoch in range(self.actor_epochs):
             _, _, logprob, entropy = self.get_action(b['observations'], b['actions'])
             entropy_loss = entropy.mean()
 
@@ -129,7 +142,8 @@ class SoftmaxActor(SoftmaxActorI):
             update_metrics[f"Ratio"] = ratio.mean().detach()
 
             mb_advantages = b['advantages']
-            if self.norm_adv: mb_advantages = normalize(mb_advantages)
+            if self.actor_norm_adv:
+                mb_advantages = normalize(mb_advantages)
 
             actor_loss = mb_advantages * ratio
             update_metrics[f"Actor Loss Non-Clipped"] = actor_loss.mean().detach()
@@ -150,12 +164,6 @@ class SoftmaxActor(SoftmaxActorI):
 
             optimizer.zero_grad(set_to_none=True)
             actor_loss.backward()
-
-            if self.log_gradients:
-                for name, param in self.named_parameters():
-                    if param.grad is not None:
-                        grad_norm = param.grad.norm().item()
-                        # update_metrics[f"ZGradients: {name}"] = grad_norm
 
             nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
             optimizer.step()

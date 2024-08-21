@@ -36,18 +36,11 @@ class Critic(CriticI):
 
         update_metrics = {}
 
-        #TODO: Parametrize this
-        self.n_epochs = 20
-        self.clip_vloss = True
-        self.max_grad_norm = 1.0
-        self.clip = 0.2
-
-        for epoch in range(self.n_epochs):
+        for epoch in range(self.critic_epochs):
             values = self(b['observations']).squeeze()
 
             # Value clipping
             if self.clip_vloss:
-                # TODO: Check if this is correct or should i *0.5 the loss before clipping
                 v_loss_unclipped = (values - b['returns']) ** 2
 
                 v_clipped = (th.clamp(values, b['values'] - self.clip, b['values'] + self.clip) - b['returns']) ** 2

@@ -7,8 +7,7 @@ from .callbacks.CallbacksI import Callback, UpdateCallback
 import argparse
 import torch as th
 import time
-
-# TODO: PPO agent has its own system for logging, saving and loading.
+import os
 
 class PPOAgentI(abc.ABC):
 
@@ -26,8 +25,8 @@ class PPOAgentI(abc.ABC):
         self.v_coef = None
 
         # Parse known arguments
-        args = self.argparse().parse_known_args()[0]
-        self.__dict__.update(args.__dict__)
+        self.cmd_args = self.argparse().parse_known_args()[0]
+        self.__dict__.update(self.cmd_args.__dict__)
 
         # Metrics saved for batch
         self.avg_reward = deque(maxlen=200)
@@ -47,7 +46,8 @@ class PPOAgentI(abc.ABC):
         }
         self.critic_metrics = {
         }
-        self.global_loss = 0
+        self.global_metrics = {
+        }
 
         # Optimizers
         self.a_optimizer = th.optim.Adam(list(self.actor.parameters()), lr=self.actor_lr, eps=1e-5)
@@ -74,9 +74,9 @@ class PPOAgentI(abc.ABC):
         parser = argparse.ArgumentParser()
         # Common configuration for any PPO agent
         parser.add_argument("--gamma", type=float, default=0.8, help="Discount factor")
-        parser.add_argument("--ent_coef", type=float, default=0.04, help="Entropy coefficient")
-        parser.add_argument("--actor_lr", type=float, default=0.00003, help="Actor learning rate")
-        parser.add_argument("--critic_lr", type=float, default=0.0001, help="Critic learning rate")
+        parser.add_argument("--actor-lr", type=float, default=0.0006, help="Actor learning rate")
+        parser.add_argument("--critic-lr", type=float, default=0.003, help="Critic learning rate")
+        parser.add_argument("--ent-coef", type=float, default=0.01, help="Entropy coefficient")
         parser.add_argument("--v-coef", type=float, default=0.5, help="Value coefficient")
         return parser
 
@@ -112,7 +112,7 @@ class PPOAgent(PPOAgentI):
         # We update the actor and critic
         self.actor_metrics = self.actor.update(b, self.a_optimizer)
         self.critic_metrics = self.critic.update(b, self.c_optimizer)
-        self.global_loss = self.actor_metrics["Actor Loss with Entropy"]  + self.critic_metrics["Critic Loss"] * self.v_coef
+        self.global_metrics["loss"] = self.actor_metrics["Actor Loss with Entropy"]  + self.critic_metrics["Critic Loss"] * self.v_coef
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
@@ -145,6 +145,12 @@ class PPOAgent(PPOAgentI):
         )
         pass
 
-    def save(self, path):
-        print("save")
+    def save(self, path : str, save_critic=False):
+        # check if the path exists
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        th.save(self.actor.state_dict(), f"{path}/actor.pth")
+        if save_critic:
+            th.save(self.critic.state_dict(), f"{path}/critic.pth")
         pass
