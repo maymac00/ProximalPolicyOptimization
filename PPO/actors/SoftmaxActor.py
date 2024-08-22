@@ -88,7 +88,7 @@ class SoftmaxActor(SoftmaxActorI):
             l = self.fully_connected[i]
             x = th.tanh(l(x))
         x = self.output(x)
-        return F.softmax(x, dim=-1)
+        return F.softmax(x.to(th.float64), dim=-1)
 
     def get_action(self, x, action=None):
         prob = self.forward(x)
@@ -124,9 +124,6 @@ class SoftmaxActor(SoftmaxActorI):
         """
         if self.action_filter is not None:
             probs = self.action_filter.select_action(probs)
-        if probs.sum() != 1.0:
-            probs = np.array(probs, dtype='float64')
-            probs = probs / probs.sum()
         return np.random.multinomial(1, probs).argmax()
 
     def load(self, path):
