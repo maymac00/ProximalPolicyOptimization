@@ -21,6 +21,7 @@ class ConvSoftmaxActor(SoftmaxActor):
         # put channels first
         sample_obs = self.transform_obs(sample_obs)
         end_dims = self.feature_map_extractor(sample_obs).shape[1]
+        print("Length of the feature vector: ", end_dims)
 
         # Add a flatten layer to the end of the feature map extractor if it is not already there
         if not isinstance(self.feature_map_extractor[-1], nn.Flatten):
