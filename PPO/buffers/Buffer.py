@@ -64,9 +64,14 @@ class Buffer(BufferI):
 
         # Mind multidimensional observations. self.b_observations.reshape((n_episodes, self.max_steps, -1))
         obs_dims = self.b_observations.shape[1:]
-
+        # Min dims is 3
+        if len(obs_dims) == 2:
+            obs_dims = (1, *obs_dims)
+            obs = self.b_observations.reshape((n_episodes, self.max_steps, *obs_dims))
+        else:
+            obs = self.b_observations.reshape((n_episodes, self.max_steps, *obs_dims)).squeeze()
         return {
-            'observations': self.b_observations.reshape((n_episodes, self.max_steps, *obs_dims)).squeeze(),
+            'observations': obs,
             'actions': self.b_actions.reshape((n_episodes, self.max_steps, -1)),
             'logprobs': self.b_logprobs.reshape((n_episodes, self.max_steps)),
             'values': self.b_values.reshape((n_episodes, self.max_steps)),

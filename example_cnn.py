@@ -76,8 +76,7 @@ if __name__ == '__main__':
 
 
     # Reset the environment to start a new episode
-    obs = env.reset()[0]['image']
-    obs = th.tensor(obs, dtype=th.float32)
+    obs = env.reset()[0]
 
     for update in range(1, total_steps // batch_size + 1):
         score = 0
@@ -86,9 +85,7 @@ if __name__ == '__main__':
             # env.render()
             action = agent.get_action(obs)
             obs, reward, done, truncated, info = env.step(action)
-            obs = th.tensor(obs['image'], dtype=th.float32)
             done = done or truncated
-
             agent.store_transition(reward, done)
 
             score += reward
