@@ -4,6 +4,7 @@ import abc
 from collections import deque
 from .actors.SoftmaxActor import SoftmaxActorI
 from .callbacks.CallbacksI import Callback, UpdateCallback
+from .utils import ObsTransformer
 import argparse
 import torch as th
 import time
@@ -100,6 +101,7 @@ class PPOAgent(PPOAgentI):
         :param s0: Random initial state of the environment
         :return:
         """
+        s0 = ObsTransformer.transform_obs(s0)
         # First, we compute the advantages and returns of the buffer with the critic
         with th.no_grad():
             value_ = self.critic(s0)
@@ -128,6 +130,7 @@ class PPOAgent(PPOAgentI):
         :param obs: Observation from the environment
         :return: Action
         """
+        obs = ObsTransformer.transform_obs(obs)
         with th.no_grad():
             self.env_action, self.action, self.logprob, _ = self.actor.get_action(obs)
             self.s_value = self.critic(obs)

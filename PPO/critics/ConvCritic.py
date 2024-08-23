@@ -6,6 +6,9 @@ from ..layers import Linear
 import torch as th
 from torch.nn import functional as F
 
+from ..utils import ObsTransformer
+
+
 class ConvCritic(Critic):
 
     def __init__(self, o_size: int, h_size: int, h_layers: int, feature_map_extractor : nn.Sequential, sample_obs, **kwargs):
@@ -18,8 +21,7 @@ class ConvCritic(Critic):
         else:
             raise ValueError("feature_map_extractor must be a list of nn.Modules or a nn.Sequential")
 
-        # put channels first
-        sample_obs = self.transform_obs(sample_obs)
+        sample_obs = ObsTransformer.transform_obs(sample_obs)
         end_dims = self.feature_map_extractor(sample_obs).shape[1]
 
         # Add a flatten layer to the end of the feature map extractor if it is not already there
@@ -30,9 +32,6 @@ class ConvCritic(Critic):
         self.fully_connected[0] = Linear(end_dims, h_size, act_fn='tanh')
 
     def forward(self, x):
-        # We assume obs have 3D HWC on any order. Transform obs returns a 4D tensor with the shape (1, C, H, W)
-        x = self.transform_obs(x)
-
         # Feature map extraction only supports 3D, 4D tensors
         if len(x.shape) == 5:
             original_shape = x.shape
