@@ -72,8 +72,8 @@ class SoftmaxActorI(abc.ABC, nn.Module):
 
 class SoftmaxActor(SoftmaxActorI):
 
-    def __init__(self, o_size: int, a_size: int, h_size: int, h_layers: int):
-        SoftmaxActorI.__init__(self, o_size, a_size, h_size, h_layers)
+    def __init__(self, o_size: int, a_size: int, h_size: int, h_layers: int, action_map=None, action_filter: SoftmaxFilterI =None , **kwargs):
+        SoftmaxActorI.__init__(self, o_size, a_size, h_size, h_layers, action_map, action_filter, **kwargs)
 
         self.fully_connected = [None] * h_layers
         self.fully_connected[0] = Linear(o_size, h_size, act_fn='tanh')

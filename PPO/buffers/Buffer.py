@@ -12,7 +12,11 @@ class Buffer(BufferI):
         super().__init__(o_size, size, max_steps, gamma, gae_lambda, device)
         a_size = 1
 
-        self.b_observations = th.zeros((self.size, o_size)).to(device)
+        if isinstance(o_size, int):
+            self.b_observations = th.zeros((self.size, o_size)).to(device)
+        else:
+            s = [self.size] + list(o_size)
+            self.b_observations = th.zeros(tuple(s)).to(device)
         self.b_actions = th.zeros((self.size, a_size)).to(device)
         self.b_logprobs = th.zeros(self.size, dtype=th.float32).to(device)
         self.b_rewards = deepcopy(self.b_logprobs)
@@ -58,8 +62,11 @@ class Buffer(BufferI):
     def sample(self):
         n_episodes = int(self.size / self.max_steps)
 
+        # Mind multidimensional observations. self.b_observations.reshape((n_episodes, self.max_steps, -1))
+        obs_dims = self.b_observations.shape[1:]
+
         return {
-            'observations': self.b_observations.reshape((n_episodes, self.max_steps, -1)),
+            'observations': self.b_observations.reshape((n_episodes, self.max_steps, *obs_dims)),
             'actions': self.b_actions.reshape((n_episodes, self.max_steps, -1)),
             'logprobs': self.b_logprobs.reshape((n_episodes, self.max_steps)),
             'values': self.b_values.reshape((n_episodes, self.max_steps)),
