@@ -4,7 +4,7 @@ from ..layers import Linear
 import torch as th
 import torch.nn as nn
 import numpy as np
-from ..utils import normalize, ObsTransformer
+from ..utils import normalize
 
 
 class ConvSoftmaxActor(SoftmaxActor):
@@ -18,17 +18,29 @@ class ConvSoftmaxActor(SoftmaxActor):
         else:
             raise ValueError("feature_map_extractor must be a list of nn.Modules or a nn.Sequential")
 
-        # put channels firstç
-        sample_obs = ObsTransformer.transform_obs(sample_obs)
+        if len(sample_obs.shape) == 2:
+            sample_obs = th.unsqueeze(sample_obs, 0)
+            sample_obs = th.unsqueeze(sample_obs, 0)
+        elif len(sample_obs.shape) == 3:
+            sample_obs = th.unsqueeze(sample_obs, 0)
+
         end_dims = self.feature_map_extractor(sample_obs).shape[1]
         print("Length of the feature vector: ", end_dims)
 
         # Add a flatten layer to the end of the feature map extractor if it is not already there
         if not isinstance(self.feature_map_extractor[-1], nn.Flatten):
+            # Add a flatten layer to the end of the feature map extractor that outputs a 1D tensor
             self.feature_map_extractor.add_module("flatten", nn.Flatten())
 
         # Change the input size of the linear layer
         self.fully_connected[0] = Linear(end_dims, h_size, act_fn='tanh')
+
+    def get_action(self, x, action=None):
+        if len(x.shape) == 2:
+            x = th.unsqueeze(x, 0)
+        prob = self.forward(x)
+        env_action, action, logprob, entropy = self.get_action_data(prob, action)
+        return env_action, action, logprob.gather(-1, action.to(th.int64)).squeeze(), entropy
 
 
     def forward(self, x):
@@ -40,7 +52,15 @@ class ConvSoftmaxActor(SoftmaxActor):
             x = x.reshape(original_shape[0], original_shape[1], -1)
             probs = super().forward(x).squeeze()
             return probs
-        else:
+        elif len(x.shape) == 2:
+            x = th.unsqueeze(x, 0)
+            x = self.feature_map_extractor(x)
+            return super().forward(x).squeeze()
+        elif len(x.shape) == 3:
+            x = th.unsqueeze(x, 0)
+            x = self.feature_map_extractor(x)
+            return super().forward(x).squeeze()
+        elif len(x.shape) == 4:
             x = self.feature_map_extractor(x)
             return super().forward(x).squeeze()
 

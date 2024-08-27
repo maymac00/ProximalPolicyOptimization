@@ -23,7 +23,7 @@ class Buffer(BufferI):
         self.b_values = deepcopy(self.b_logprobs)
         self.b_dones = deepcopy(self.b_logprobs)
 
-    def store(self, observation, action, logprob, reward, value, done):
+    def store(self, observation, action, logprob, reward, value, done, *args, **kwargs):
         """
         Store the data in the buffer
         :param observation:
