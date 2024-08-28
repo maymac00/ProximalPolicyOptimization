@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 
 from .CriticI import CriticI
@@ -35,20 +37,21 @@ class Critic(CriticI):
     def update(self, b, optimizer):
 
         update_metrics = {}
-
+        last_values = self(b['observations']).squeeze()
         for epoch in range(self.critic_epochs):
             values = self(b['observations']).squeeze()
+
 
             # Value clipping
             if self.clip_vloss:
                 v_loss_unclipped = (values - b['returns']) ** 2
 
-                v_clipped = (th.clamp(values, b['values'] - self.clip, b['values'] + self.clip) - b['returns']) ** 2
+                v_clipped = (th.clamp(values, last_values - self.clip, last_values + self.clip) - b['returns']) ** 2
                 v_loss_clipped = th.min(v_loss_unclipped, v_clipped)
 
                 # Log percent of clipped ratio
                 update_metrics[f"Critic Clipped Ratio"] = ((values < (
-                            b['values'] - self.clip)).sum().item() + (values > (b['values'] + self.clip)).sum().item()) / np.prod(values.shape)
+                            last_values - self.clip)).sum().item() + (values > (last_values + self.clip)).sum().item()) / np.prod(values.shape)
 
                 critic_loss = 0.5 * v_loss_clipped.mean()
                 update_metrics[f"Critic Loss"] = critic_loss.detach()
@@ -61,4 +64,6 @@ class Critic(CriticI):
             critic_loss.backward()
             nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
             optimizer.step()
+
+            last_values = copy.deepcopy(values.detach())
         return update_metrics
