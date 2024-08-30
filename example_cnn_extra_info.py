@@ -1,3 +1,5 @@
+from collections import deque
+
 import numpy as np
 import torch
 import torch as th
@@ -28,7 +30,9 @@ if __name__ == '__main__':
 
     obs = env.reset(seed=0)[0][0]
     sample_obs = th.Tensor(obs['image'])
-    sample_extra_info = th.Tensor([obs['donation_box'] , obs['survival_status']])
+    recent_action = deque([4.0 / 6] * 5, maxlen=5)
+    sample_extra_info = th.Tensor([obs['donation_box'] , obs['survival_status'], *recent_action])
+
 
     # Train the agent
     total_steps = int(2e6)
@@ -61,7 +65,7 @@ if __name__ == '__main__':
     # Reset the environment to start a new episode
     state = env.reset(seed=0)[0][0]
     obs = th.Tensor(state['image'])
-    extra_info = th.Tensor([state['donation_box'], state['survival_status']])
+    extra_info = th.Tensor([state['donation_box'] , state['survival_status'], *recent_action])
 
     for update in range(1, total_steps // batch_size + 1):
         score = 0
@@ -71,26 +75,29 @@ if __name__ == '__main__':
                 env.render(mode="partial_observability")
             action = agent.get_action(obs, cat=extra_info)
             state, reward, done, info = env.step([action])
+            recent_action.append(action/6)
             state = state[0] # We are on single agent
             reward = reward[0]
             done = done[0]
 
             obs = th.Tensor(state['image'])
-            extra_info = th.Tensor([state['donation_box'], state['survival_status']])
+            extra_info = th.Tensor([state['donation_box'], state['survival_status'], *recent_action])
             agent.store_transition(reward, done)
 
             score += reward
             if done:
                 #print(f"Score: {score}")
+                recent_action = deque([4.0 / 6] * 5, maxlen=5)
                 state = env.reset(seed=0)[0][0]
                 obs = th.Tensor(state['image'])
-                extra_info = th.Tensor([state['donation_box'], state['survival_status']])
+                extra_info = th.Tensor([state['donation_box'] , state['survival_status'], *recent_action])
                 scoress.append(score)
                 score = 0
 
         state = env.reset(seed=0)[0][0]
         obs = th.Tensor(state['image'])
-        extra_info = th.Tensor([state['donation_box'], state['survival_status']])
+        recent_action = deque([4.0 / 6] * 5, maxlen=5)
+        extra_info = th.Tensor([state['donation_box'], state['survival_status'], *recent_action])
         agent.update(obs, cat=extra_info)
         print(f"Update {update}, score: {sum(scoress[-10:]) / 10}")
 

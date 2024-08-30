@@ -46,9 +46,9 @@ class PPOAgentExtraInfo:
         b = self.buffer.sample()
 
         # We update the actor and critic
-        actor_metrics = self.actor.update(b, self.a_optimizer)
-        critic_metrics = self.critic.update(b, self.c_optimizer)
-        self.global_metrics["loss"] = actor_metrics["Actor Loss with Entropy"] + critic_metrics[
+        self.actor_metrics = self.actor.update(b, self.a_optimizer)
+        self.critic_metrics = self.critic.update(b, self.c_optimizer)
+        self.global_metrics["loss"] = self.actor_metrics["Actor Loss with Entropy"] + self.critic_metrics[
             "Critic Loss"] * self.v_coef
 
         if self.lr_scheduler is not None:
