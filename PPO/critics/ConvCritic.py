@@ -87,6 +87,8 @@ class ConvCriticCat:
 
     def forward(self, x, cat=None):
         cat = th.unsqueeze(cat, 0)
+        if not isinstance(x, th.Tensor):
+            x = th.tensor(x, dtype=th.float32)
         # Feature map extraction only supports 3D, 4D tensors
         if len(x.shape) == 5:
             original_shape = x.shape
