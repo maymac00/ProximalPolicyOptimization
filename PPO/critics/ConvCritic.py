@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 
 from .Critic import Critic
@@ -29,6 +31,12 @@ class ConvCritic(Critic):
         # Change the input size of the linear layer
         self.fully_connected[0] = Linear(end_dims, h_size, act_fn='tanh')
 
+    def regression_head(self, x):
+        for i in range(len(self.fully_connected)):
+            l = self.fully_connected[i]
+            x = F.leaky_relu(l(x))
+        return self.output(x)
+
     def feature_map_extraction(self, x):
         for layer in self.feature_map_extractor:
             x = layer(x)
@@ -41,21 +49,77 @@ class ConvCritic(Critic):
             x = x.reshape(-1, *x.shape[2:])
             x = self.feature_map_extraction(x)
             x = x.reshape(original_shape[0], original_shape[1], -1)
-            probs = super().forward(x).squeeze()
+            probs = self.regression_head(x)
             return probs
         elif len(x.shape) == 2:
             x = th.unsqueeze(x, 0)
             x = th.unsqueeze(x, 0)
             x = self.feature_map_extraction(x)
-            return super().forward(x).squeeze()
+            return self.regression_head(x)
         elif len(x.shape) == 3:
             x = th.unsqueeze(x, 0)
             x = self.feature_map_extraction(x)
-            return super().forward(x).squeeze()
+            return self.regression_head(x)
         elif len(x.shape) == 4:
             x = self.feature_map_extraction(x)
-            return super().forward(x).squeeze()
+            return self.regression_head(x)
 
 
 
     # TODO: Freeze and unfreeze CNN layers
+
+class ConvCriticCat:
+    def __init__(self, critic: ConvCritic, extra_info_shape):
+        self.critic = critic
+        layer_shape = (self.critic.fully_connected[0].in_features, self.critic.fully_connected[0].out_features)
+        self.critic.fully_connected[0] = Linear(layer_shape[0] + extra_info_shape[0], layer_shape[1])
+
+    def __getattr__(self, item):
+        if item in self.__dict__:
+            return self.__dict__[item]
+        return getattr(self.critic, item)
+
+    def regression_head(self, x):
+        for i in range(len(self.fully_connected)):
+            l = self.fully_connected[i]
+            x = F.leaky_relu(l(x))
+        return self.output(x)
+
+    def forward(self, x, cat=None):
+        cat = th.unsqueeze(cat, 0)
+        # Feature map extraction only supports 3D, 4D tensors
+        if len(x.shape) == 5:
+            original_shape = x.shape
+            x = x.reshape(-1, *x.shape[2:])
+            x = self.feature_map_extraction(x)
+            x = x.reshape(original_shape[0], original_shape[1], -1)
+            x = th.cat([x, cat.squeeze()], dim=-1)
+            probs = self.regression_head(x)
+            return probs
+        elif len(x.shape) == 2:
+            x = th.unsqueeze(x, 0)
+            x = th.unsqueeze(x, 0)
+            x = self.feature_map_extraction(x)
+            x = th.cat([x, cat], dim=-1)
+            return self.regression_head(x)
+        elif len(x.shape) == 3:
+            x = th.unsqueeze(x, 0)
+            x = self.feature_map_extraction(x)
+            x = th.cat([x, cat], dim=-1)
+            return self.regression_head(x)
+        elif len(x.shape) == 4:
+            x = self.feature_map_extraction(x)
+            x = th.cat([x, cat], dim=-1)
+            return self.regression_head(x)
+
+    def update(self, b, optimizer, **kwargs):
+        last_values = self(b['observations'], cat=b["extra_info"]).squeeze()
+        for epoch in range(self.critic_epochs):
+            values = self(b['observations'], cat=b["extra_info"]).squeeze()
+            self._update(values, last_values, b, optimizer, log=epoch == self.critic_epochs - 1)
+
+            last_values = copy.deepcopy(values.detach())
+        return self.update_metrics
+
+    def __call__(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)

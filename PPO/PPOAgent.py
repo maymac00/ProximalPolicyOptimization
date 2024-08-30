@@ -91,7 +91,6 @@ class PPOAgentI(abc.ABC):
 class PPOAgent(PPOAgentI):
     def __init__(self, actor: SoftmaxActorI, critic: CriticI, buffer: BufferI, **kwargs):
         super().__init__(actor, critic, buffer, **kwargs)
-
         pass
 
     def update(self, s0):
@@ -128,6 +127,7 @@ class PPOAgent(PPOAgentI):
         :param obs: Observation from the environment
         :return: Action
         """
+
         if len(obs.shape) == 2:
             obs = th.unsqueeze(obs, 0)
         with th.no_grad():
@@ -137,14 +137,7 @@ class PPOAgent(PPOAgentI):
         return self.env_action
 
     def store_transition(self, r, done, *args, **kwargs):
-        self.buffer.store(
-            self.obs,
-            self.action,
-            self.logprob,
-            r,
-            self.s_value,
-            done
-        )
+        self.buffer.store(self.obs,self.action,self.logprob,r,self.s_value,done)
         pass
 
     def save(self, path : str, save_critic=False):

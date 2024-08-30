@@ -20,6 +20,8 @@ class Critic(CriticI):
         self.fully_connected = nn.ModuleList(self.fully_connected)
         self.output = Linear(h_size, 1, act_fn='linear')
 
+        self.update_metrics = {}
+
     def forward(self, x):
         for i in range(len(self.fully_connected)):
             l = self.fully_connected[i]
@@ -34,36 +36,37 @@ class Critic(CriticI):
         for param in self.parameters():
             param.requires_grad = True
 
-    def update(self, b, optimizer):
+    def update(self, b, optimizer, **kwargs):
 
-        update_metrics = {}
+        self.update_metrics = {}
         last_values = self(b['observations']).squeeze()
         for epoch in range(self.critic_epochs):
             values = self(b['observations']).squeeze()
-
-
-            # Value clipping
-            if self.clip_vloss:
-                v_loss_unclipped = (values - b['returns']) ** 2
-
-                v_clipped = (th.clamp(values, last_values - self.clip, last_values + self.clip) - b['returns']) ** 2
-                v_loss_clipped = th.min(v_loss_unclipped, v_clipped)
-
-                # Log percent of clipped ratio
-                update_metrics[f"Critic Clipped Ratio"] = ((values < (
-                            last_values - self.clip)).sum().item() + (values > (last_values + self.clip)).sum().item()) / np.prod(values.shape)
-
-                critic_loss = 0.5 * v_loss_clipped.mean()
-                update_metrics[f"Critic Loss"] = critic_loss.detach()
-            else:
-                # No value clipping
-                critic_loss = 0.5 * ((values - b['returns']) ** 2).mean()
-                update_metrics[f"Critic Loss"] = critic_loss.detach()
-
-            optimizer.zero_grad(True)
-            critic_loss.backward()
-            nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
-            optimizer.step()
+            self._update(values, last_values, b, optimizer, log=epoch == self.critic_epochs - 1)
 
             last_values = copy.deepcopy(values.detach())
-        return update_metrics
+        return self.update_metrics
+
+    def _update(self, values, last_values, b, optimizer, log=False):
+        if self.clip_vloss:
+            v_loss_unclipped = (values - b['returns']) ** 2
+
+            v_clipped = (th.clamp(values, last_values - self.clip, last_values + self.clip) - b['returns']) ** 2
+            v_loss_clipped = th.min(v_loss_unclipped, v_clipped)
+
+            # Log percent of clipped ratio
+            if log: self.update_metrics[f"Critic Clipped Ratio"] = ((values < (
+                    last_values - self.clip)).sum().item() + (values > (
+                        last_values + self.clip)).sum().item()) / np.prod(values.shape)
+
+            critic_loss = 0.5 * v_loss_clipped.mean()
+            if log: self.update_metrics[f"Critic Loss"] = critic_loss.detach()
+        else:
+            # No value clipping
+            critic_loss = 0.5 * ((values - b['returns']) ** 2).mean()
+            if log: self.update_metrics[f"Critic Loss"] = critic_loss.detach()
+
+        optimizer.zero_grad(True)
+        critic_loss.backward()
+        nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
+        optimizer.step()

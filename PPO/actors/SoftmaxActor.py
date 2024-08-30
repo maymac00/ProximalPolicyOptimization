@@ -83,6 +83,8 @@ class SoftmaxActor(SoftmaxActorI):
         self.output = nn.Linear(h_size, a_size)
         self.fully_connected = nn.ModuleList(self.fully_connected)
 
+        self.update_metrics = {}
+
     def forward(self, x):
         for i in range(len(self.fully_connected)):
             l = self.fully_connected[i]
@@ -90,7 +92,7 @@ class SoftmaxActor(SoftmaxActorI):
         x = self.output(x)
         return F.softmax(x.to(th.float64), dim=-1)
 
-    def get_action(self, x, action=None):
+    def get_action(self, x, action=None, *args, **kwargs):
         prob = self.forward(x)
         env_action, action, logprob, entropy = self.get_action_data(prob, action)
         return env_action, action, logprob.gather(-1, action.to(th.int64)).squeeze(), entropy
@@ -104,7 +106,7 @@ class SoftmaxActor(SoftmaxActorI):
 
         logprob = th.log(prob)
         entropy = -(prob * logprob).sum(-1)
-        return env_action, action, logprob, entropy
+        return env_action, action, logprob.squeeze(), entropy
 
     def predict(self, x):
         # Check if its a tensor
@@ -122,6 +124,7 @@ class SoftmaxActor(SoftmaxActorI):
         :param probs:
         :return:
         """
+        probs = np.array(probs, dtype='float64').squeeze()
         if self.action_filter is not None:
             probs = self.action_filter.select_action(probs)
         return np.random.multinomial(1, probs).argmax()
@@ -129,44 +132,47 @@ class SoftmaxActor(SoftmaxActorI):
     def load(self, path):
         self.load_state_dict(th.load(path))
 
-
     def update(self, b, optimizer):
-        update_metrics = {}
+        self.update_metrics = {}
 
         for epoch in range(self.actor_epochs):
             _, _, logprob, entropy = self.get_action(b['observations'], b['actions'])
-            entropy_loss = entropy.mean()
+            self._update(logprob, entropy, b, optimizer, log=epoch == self.actor_epochs - 1)
 
-            update_metrics[f"Entropy"] = entropy_loss.detach()
+        return self.update_metrics
+    
+    def _update(self, logprob, entropy, b, optimizer, log=False):
+        entropy_loss = entropy.mean()
 
-            logratio = logprob - b['logprobs']
-            ratio = logratio.exp()
-            update_metrics[f"Ratio"] = ratio.mean().detach()
+        if log: self.update_metrics[f"Entropy"] = entropy_loss.detach()
 
-            mb_advantages = b['advantages']
-            if self.actor_norm_adv:
-                mb_advantages = normalize(mb_advantages)
+        logratio = logprob - b['logprobs']
+        ratio = logratio.exp()
+        if log: self.update_metrics[f"Ratio"] = ratio.mean().detach()
 
-            actor_loss = mb_advantages * ratio
-            update_metrics[f"Actor Loss Non-Clipped"] = actor_loss.mean().detach()
+        mb_advantages = b['advantages']
+        if self.actor_norm_adv:
+            mb_advantages = normalize(mb_advantages)
 
-            clipped_ratios = th.clamp(ratio, 1 - self.clip, 1 + self.clip)
-            actor_clip_loss = mb_advantages * clipped_ratios
+        actor_loss = mb_advantages * ratio
+        if log: self.update_metrics[f"Actor Loss Non-Clipped"] = actor_loss.mean().detach()
 
-            # Log percent of clipped ratio
-            update_metrics[f"Clipped Ratio"] = ((ratio < (1 - self.clip)).sum().item() + (
-                        ratio > (1 + self.clip)).sum().item()) / np.prod(ratio.shape)
+        clipped_ratios = th.clamp(ratio, 1 - self.clip, 1 + self.clip)
+        actor_clip_loss = mb_advantages * clipped_ratios
 
-            # Calculate clip fraction
-            actor_loss = th.min(actor_loss, actor_clip_loss).mean()
-            update_metrics[f"Actor Loss"] = actor_loss.detach()
+        # Log percent of clipped ratio
+        if log: self.update_metrics[f"Clipped Ratio"] = ((ratio < (1 - self.clip)).sum().item() + (
+                ratio > (1 + self.clip)).sum().item()) / np.prod(ratio.shape)
 
-            actor_loss = -actor_loss - self.entropy_value * entropy_loss
-            update_metrics[f"Actor Loss with Entropy"] = actor_loss.detach()
+        # Calculate clip fraction
+        actor_loss = th.min(actor_loss, actor_clip_loss).mean()
+        if log: self.update_metrics[f"Actor Loss"] = actor_loss.detach()
 
-            optimizer.zero_grad(set_to_none=True)
-            actor_loss.backward()
+        actor_loss = -actor_loss - self.entropy_value * entropy_loss
+        if log: self.update_metrics[f"Actor Loss with Entropy"] = actor_loss.detach()
 
-            nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
-            optimizer.step()
-        return update_metrics
+        optimizer.zero_grad(set_to_none=True)
+        actor_loss.backward()
+
+        nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
+        optimizer.step()

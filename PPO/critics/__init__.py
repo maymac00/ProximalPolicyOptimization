@@ -1,2 +1,2 @@
 from .Critic import Critic
-from .ConvCritic import ConvCritic
+from .ConvCritic import ConvCritic, ConvCriticCat
