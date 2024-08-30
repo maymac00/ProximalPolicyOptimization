@@ -99,6 +99,8 @@ class PPOAgent(PPOAgentI):
         :param s0: Random initial state of the environment
         :return:
         """
+        if not isinstance(s0, th.Tensor):
+            s0 = th.tensor(s0, dtype=th.float32)
         # First, we compute the advantages and returns of the buffer with the critic
         with th.no_grad():
             value_ = self.critic(s0)
