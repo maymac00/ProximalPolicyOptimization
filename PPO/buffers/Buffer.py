@@ -8,7 +8,7 @@ class Buffer(BufferI):
     Class for the Buffer creation
     """
 
-    def __init__(self, o_size: int, size: int, max_steps: int, gamma: float, gae_lambda: float, device: th.device):
+    def __init__(self, o_size: int | tuple[int], size: int, max_steps: int, gamma: float, gae_lambda: float, device: th.device):
         super().__init__(o_size, size, max_steps, gamma, gae_lambda, device)
         a_size = 1
         self.obs_dims = o_size
