@@ -127,7 +127,8 @@ class PPOAgent(PPOAgentI):
         :param obs: Observation from the environment
         :return: Action
         """
-
+        if not isinstance(obs, th.Tensor):
+            obs = th.tensor(obs, dtype=th.float32)
         if len(obs.shape) == 2:
             obs = th.unsqueeze(obs, 0)
         with th.no_grad():

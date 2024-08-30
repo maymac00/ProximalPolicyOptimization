@@ -1,3 +1,5 @@
+import numpy as np
+
 from .SoftmaxActor import SoftmaxActor
 from .filters import SoftmaxFilterI
 from ..layers import Linear
@@ -116,6 +118,7 @@ class ConvSoftmaxActorCat:
             return probs
         elif len(x.shape) == 2:
             x = th.unsqueeze(x, 0)
+            x = th.unsqueeze(x, 0)
             x = self.feature_map_extraction(x)
             x = th.cat([x, cat], dim=-1)
             return self.classification_head(x)
@@ -138,3 +141,12 @@ class ConvSoftmaxActorCat:
             self._update(logprob, entropy, b, optimizer, log=epoch == self.actor_epochs - 1)
 
         return self.update_metrics
+
+    def predict(self, x, cat=None):
+        # Check if it's a tensor
+        if not isinstance(x, th.Tensor):
+            x = th.tensor(x, dtype=th.float32)
+        with th.no_grad():
+            prob = self.forward(x, cat)
+            action = self.select_action(np.array(prob, dtype='float64').squeeze())
+        return self.action_map[action]
