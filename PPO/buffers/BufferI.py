@@ -89,3 +89,7 @@ class BufferI(abc.ABC):
     @abc.abstractmethod
     def __radd__(self, other):
         pass
+
+    @abc.abstractmethod
+    def resize(self, new_size):
+        pass

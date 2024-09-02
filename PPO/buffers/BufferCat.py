@@ -1,7 +1,8 @@
 from .Buffer import Buffer
 import torch as th
 
-class BufferCat:
+# it's a wrapper class for Buffer class
+class BufferCat(Buffer):
     def __init__(self, buffer_instance, extra_info_shape):
         # Store the provided Buffer instance
         self.buffer = buffer_instance
@@ -44,7 +45,6 @@ class BufferCat:
         else:
             raise ValueError("Cannot add BufferCat with other Buffer type")
 
-    def __getattr__(self, item):
-        if item in self.__dict__:
-            return self.__dict__[item]
-        return getattr(self.buffer, item)
+    def resize(self, new_size):
+        self.buffer.resize(new_size)
+        self.b_extra_info = th.zeros((self.buffer.size, *self.extra_info_shape)).to(self.buffer.device)

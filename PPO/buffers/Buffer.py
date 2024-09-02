@@ -90,6 +90,9 @@ class Buffer(BufferI):
         self.b_values = self.b_values.detach()
         self.b_dones = self.b_dones.detach()
 
+    def resize(self, new_size):
+        self.__init__(self.obs_dims, new_size, self.max_steps, self.gamma, self.gae_lambda, self.device)
+
     def __add__(self, other):
         """
         Merge two buffers into a single one.
