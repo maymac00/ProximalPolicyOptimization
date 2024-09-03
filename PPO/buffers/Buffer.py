@@ -130,3 +130,11 @@ class Buffer(BufferI):
 
     def __radd__(self, other):
         return self.__add__(other)
+
+    def buffer_episodic_return(self):
+        """
+        Compute the episodic return of the experiences on the buffer. This value is not reliable, as the buffer may be partially empty,
+        but serves as orientation
+        :return: Tensor
+        """
+        return self.b_rewards.sum() / self.b_dones.sum()
