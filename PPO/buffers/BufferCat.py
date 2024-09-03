@@ -61,6 +61,11 @@ class BufferCat(Buffer):
         else:
             raise ValueError("Cannot add BufferCat with other Buffer type")
 
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+
     def resize(self, new_size):
         self.__init__(self.extra_info_shape, self.obs_dims, new_size, self.max_steps, self.gamma, self.gae_lambda,
                       self.device)
