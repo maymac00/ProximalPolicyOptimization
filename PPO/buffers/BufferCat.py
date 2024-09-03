@@ -1,3 +1,5 @@
+from torch.cuda import device
+
 from .Buffer import Buffer
 import torch as th
 
@@ -37,9 +39,24 @@ class BufferCat(Buffer):
 
     def __add__(self, other):
         if isinstance(other, BufferCat):
-            merged_buffer = super().__add__(other)
+            device = self.device
+            size =  self.size + other.size
+            merged_buffer = BufferCat(self.extra_info_shape, self.obs_dims, size, self.max_steps,
+                                      self.gamma, self.gae_lambda, self.device)
+
             # Create a new BufferCat with the merged Buffer
             merged_buffer.b_extra_info = th.cat((self.b_extra_info, other.b_extra_info), dim=0).to(self.device)
+            # Concatenate the tensors
+            merged_buffer.b_observations = th.cat([self.b_observations, other.b_observations]).to(device)
+            merged_buffer.b_actions = th.cat([self.b_actions, other.b_actions]).to(device)
+            merged_buffer.b_logprobs = th.cat([self.b_logprobs, other.b_logprobs]).to(device)
+            merged_buffer.b_rewards = th.cat([self.b_rewards, other.b_rewards]).to(device)
+            merged_buffer.b_values = th.cat([self.b_values, other.b_values]).to(device)
+            merged_buffer.b_dones = th.cat([self.b_dones, other.b_dones]).to(device)
+
+            # Handle the indices correctly
+            merged_buffer.idx = size
+
             return merged_buffer
         else:
             raise ValueError("Cannot add BufferCat with other Buffer type")
