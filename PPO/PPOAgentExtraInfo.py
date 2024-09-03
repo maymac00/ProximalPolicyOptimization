@@ -12,7 +12,8 @@ class PPOAgentExtraInfo:
         self.extra_info_shape = extra_info_shape
 
         self.actor = ConvSoftmaxActorCat(agent.actor, extra_info_shape)
-        self.buffer = BufferCat(agent.buffer, self.extra_info_shape)
+        self.buffer = BufferCat(self.extra_info_shape, agent.buffer.o_size, agent.buffer.size, agent.buffer.max_steps,
+                                agent.buffer.gamma, agent.buffer.gae_lambda, agent.buffer.device)
         self.critic = ConvCriticCat(agent.critic, extra_info_shape)
 
         self.last_cat = None
