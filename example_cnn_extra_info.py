@@ -62,6 +62,10 @@ if __name__ == '__main__':
         AnnealEntropyCallback(agent, total_steps // batch_size)
     ])
 
+    # Test resize
+    agent.buffer.resize(500)
+    agent.buffer.resize(batch_size)
+
     # Reset the environment to start a new episode
     state = env.reset(seed=0)[0][0]
     obs = th.Tensor(state['image'])

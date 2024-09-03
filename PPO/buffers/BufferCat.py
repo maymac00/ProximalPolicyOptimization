@@ -45,5 +45,5 @@ class BufferCat(Buffer):
             raise ValueError("Cannot add BufferCat with other Buffer type")
 
     def resize(self, new_size):
-        super().resize(new_size)
-        self.b_extra_info = th.zeros((self.size, *self.extra_info_shape)).to(self.device)
+        self.__init__(self.extra_info_shape, self.obs_dims, new_size, self.max_steps, self.gamma, self.gae_lambda,
+                      self.device)
